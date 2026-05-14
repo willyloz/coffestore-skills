@@ -647,4 +647,3 @@ revenue = get_monthly_revenue(clinic_id)
 print(f"Total: ${revenue['total_revenue']:,.0f} COP")
 print(f"Tratamientos completados: {revenue['total_treatments']}")
 ```
-
