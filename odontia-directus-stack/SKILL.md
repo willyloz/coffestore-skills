@@ -145,7 +145,6 @@ import requests
 import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-import pytz
 
 DIRECTUS_URL = "https://directus.drawood.co"
 TOKEN = os.getenv("DENTAL_DIRECTUS_TOKEN")
@@ -157,9 +156,6 @@ HEADERS = {
     "Authorization": f"Bearer {TOKEN}",
     "Content-Type": "application/json"
 }
-
-# Zona horaria de Colombia
-COLOMBIA_TZ = pytz.timezone('America/Bogota')
 
 def directus_request(endpoint: str, method: str = "GET", params: Dict = None, data: Dict = None):
     """
@@ -178,97 +174,45 @@ def directus_request(endpoint: str, method: str = "GET", params: Dict = None, da
     
     response.raise_for_status()
     return response.json()
-
-def utc_to_colombia(utc_datetime_str: str) -> datetime:
-      """
-      Convierte una fecha UTC a hora de Colombia (America/Bogota)
-      
-      Args:
-          utc_datetime_str: Fecha en formato ISO UTC (ej: "2026-05-13T16:00:00.000Z")
-          
-      Returns:
-          datetime object en zona horaria de Colombia
-      """
-    # Parsear la fecha UTC
-    utc_dt = datetime.fromisoformat(utc_datetime_str.replace('Z', '+00:00'))
-
-    # Convertir a zona horaria de Colombia
-    colombia_dt = utc_dt.astimezone(COLOMBIA_TZ)
-
-    return colombia_dt
-
-def format_datetime_colombia(utc_datetime_str: str) -> str:
-  """
-  Formatea una fecha UTC a formato legible en hora de Colombia
-  
-  Args:
-      utc_datetime_str: Fecha en formato ISO UTC
-      
-  Returns:
-      String formateado: "DD/MM/YYYY HH:MM" en hora de Colombia
-  """
-  if not utc_datetime_str:
-    return "—"
-
-  try:
-    colombia_dt = utc_to_colombia(utc_datetime_str)
-    return colombia_dt.strftime("%d/%m/%Y %H:%M")
-  except:
-    return utc_datetime_str  # Fallback si falla la conversión
 ```
 
 ### 1. Obtener Citas del Día
 
 ```python
 def get_appointments_today(clinic_id: int) -> List[Dict]:
-  """
-  Obtiene todas las citas programadas para hoy de una clínica específica.
-  IMPORTANTE: Usa hora de Colombia (America/Bogota)
-  
-  Args:
-      clinic_id: ID de la clínica
-      
-  Returns:
-      Lista de citas con información del paciente y dentista
-  """
-  # Obtener fecha actual en Colombia
-  now_colombia = datetime.now(COLOMBIA_TZ)
-  today_start = now_colombia.replace(hour=0, minute=0, second=0, microsecond=0)
-  today_end = today_start + timedelta(days=1)
-
-  # Convertir a UTC para el query
-  today_start_utc = today_start.astimezone(pytz.UTC).isoformat()
-  today_end_utc = today_end.astimezone(pytz.UTC).isoformat()
-
-  params = {
-    "filter[clinic_id][_eq]": clinic_id,
-    "filter[date_time][_gte]": today_start_utc,
-    "filter[date_time][_lt]": today_end_utc,
-    "fields": ",".join([
-      "*",
-      "patient_id.id",
-      "patient_id.first_name",
-      "patient_id.last_name",
-      "patient_id.phone",
-      "patient_id.email",
-      "dentist_id.id",
-      "dentist_id.directus_users_id.first_name",
-      "dentist_id.directus_users_id.last_name",
-      "dentist_id.specialty"
-    ]),
-    "sort": "date_time"
-  }
-
-  result = directus_request("/items/appointments", params=params)
-  appointments = result.get("data", [])
-
-  # Convertir fechas a hora de Colombia
-  for apt in appointments:
-    if apt.get('date_time'):
-      # Agregar campo con hora de Colombia formateada
-      apt['date_time_colombia'] = format_datetime_colombia(apt['date_time'])
-
-  return appointments
+    """
+    Obtiene todas las citas programadas para hoy de una clínica específica.
+    
+    Args:
+        clinic_id: ID de la clínica
+        
+    Returns:
+        Lista de citas con información del paciente y dentista
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    params = {
+        "filter[clinic_id][_eq]": clinic_id,
+        "filter[date_time][_gte]": today,
+        "filter[date_time][_lt]": tomorrow,
+        "fields": ",".join([
+            "*",
+            "patient_id.id",
+            "patient_id.first_name",
+            "patient_id.last_name",
+            "patient_id.phone",
+            "patient_id.email",
+            "dentist_id.id",
+            "dentist_id.directus_users_id.first_name",
+            "dentist_id.directus_users_id.last_name",
+            "dentist_id.specialty"
+        ]),
+        "sort": "date_time"
+    }
+    
+    result = directus_request("/items/appointments", params=params)
+    return result.get("data", [])
 ```
 
 ### 2. Obtener Citas por Fecha
@@ -574,12 +518,6 @@ Por favor responde:
 ```
 
 ## Usage Instructions
-
-### IMPORTANTE - Zona Horaria:
-- Todas las fechas en Directus están en **UTC**
-- SIEMPRE usa las funciones de conversión para mostrar en hora de Colombia
-- Usa el campo `date_time_colombia` que ya viene formateado
-- Ejemplo: apt['date_time_colombia'] → "13/05/2026 11:00"
 
 ### Cuando el usuario pregunta sobre:
 
